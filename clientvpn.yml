@@ -1,0 +1,137 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Deploy the Client VPN'
+
+Parameters:
+  ServerCertificateArn:
+    Type: String
+    Description: ARN of the server certificate used for the VPN endpoint
+    
+  ClientCidrBlock:
+    Type: String
+    AllowedPattern: '^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$'
+    Description: CIDR range for the clients connecting to the VPN
+    
+  DevVPCCIDRBlock:
+    Type: String
+    AllowedPattern: '^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$'
+    Description: CIDR range for the Dev VPC
+    
+  TestVPCCIDRBlock:
+    Type: String
+    AllowedPattern: '^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$'
+    Description: CIDR range for the Test VPC
+    
+  EgressVPCId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID of the Egress VPC
+  
+  PrivateSubnetAId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet ID of private subnet A
+    
+  PrivateSubnetBId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet ID of private subnet B
+
+Resources:
+
+  VPNSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: "Security group for VPN endpoint"
+      Tags: 
+        - Key: Name
+          Value: 'client-vpn-endpoint'
+        - Key: ProjectIdentifier
+          Value: 'Core'
+      VpcId: !Ref EgressVPCId
+      
+  ClientVPNEndpointLogsGroup:
+    Type: AWS::Logs::LogGroup
+
+  ClientVpnEndpoint:
+    Type: AWS::EC2::ClientVpnEndpoint
+    Properties: 
+      AuthenticationOptions:
+      - Type: "certificate-authentication"
+        MutualAuthentication: 
+          ClientRootCertificateChainArn: !Ref ServerCertificateArn
+      ClientCidrBlock: !Ref ClientCidrBlock
+      ConnectionLogOptions: 
+        Enabled: true
+        CloudwatchLogGroup: !Ref ClientVPNEndpointLogsGroup
+
+      Description: "Client VPN Endpoint"
+      SecurityGroupIds:
+        - !GetAtt VPNSecurityGroup.GroupId
+      ServerCertificateArn: !Ref ServerCertificateArn
+      SplitTunnel: true
+      VpcId: !Ref EgressVPCId
+      TransportProtocol: "udp"
+      
+  EgressVPCSubnetAAssociation:
+    Type: AWS::EC2::ClientVpnTargetNetworkAssociation
+    Properties:
+      ClientVpnEndpointId: 
+        Ref: ClientVpnEndpoint
+      SubnetId: !Ref PrivateSubnetAId
+
+  EgressVPCSubnetBAssociation:
+    Type: AWS::EC2::ClientVpnTargetNetworkAssociation
+    Properties:
+      ClientVpnEndpointId: 
+        Ref: ClientVpnEndpoint
+      SubnetId: !Ref PrivateSubnetBId
+
+  AuthoriseDevVPCRule:
+    Type: AWS::EC2::ClientVpnAuthorizationRule
+    Properties: 
+      AuthorizeAllGroups: true
+      ClientVpnEndpointId: !Ref ClientVpnEndpoint
+      Description: "Authorise Development VPC"
+      TargetNetworkCidr: !Ref DevVPCCIDRBlock
+      
+  AuthoriseTestVPCRule:
+    Type: AWS::EC2::ClientVpnAuthorizationRule
+    Properties: 
+      AuthorizeAllGroups: true
+      ClientVpnEndpointId: !Ref ClientVpnEndpoint
+      Description: "Authorise Test VPC"
+      TargetNetworkCidr: !Ref TestVPCCIDRBlock
+      
+  DevVPCSubnetARoute:
+    Type: AWS::EC2::ClientVpnRoute
+    DependsOn: EgressVPCSubnetAAssociation
+    Properties: 
+      ClientVpnEndpointId: !Ref ClientVpnEndpoint
+      Description: "Route to Dev VPC via Subnet A"
+      DestinationCidrBlock: !Ref DevVPCCIDRBlock
+      TargetVpcSubnetId: !Ref PrivateSubnetAId
+      
+  DevVPCSubnetBRoute:
+    Type: AWS::EC2::ClientVpnRoute
+    DependsOn: EgressVPCSubnetBAssociation
+    Properties: 
+      ClientVpnEndpointId: !Ref ClientVpnEndpoint
+      Description: "Route to Dev VPC via Subnet B"
+      DestinationCidrBlock: !Ref DevVPCCIDRBlock
+      TargetVpcSubnetId: !Ref PrivateSubnetBId
+      
+  TestVPCSubnetARoute:
+    Type: AWS::EC2::ClientVpnRoute
+    DependsOn: EgressVPCSubnetAAssociation
+    Properties: 
+      ClientVpnEndpointId: !Ref ClientVpnEndpoint
+      Description: "Route to Test VPC via Subnet A"
+      DestinationCidrBlock: !Ref TestVPCCIDRBlock
+      TargetVpcSubnetId: !Ref PrivateSubnetAId
+      
+  TestVPCSubnetBRoute:
+    Type: AWS::EC2::ClientVpnRoute
+    DependsOn: EgressVPCSubnetBAssociation
+    Properties: 
+      ClientVpnEndpointId: !Ref ClientVpnEndpoint
+      Description: "Route to Test VPC via Subnet B"
+      DestinationCidrBlock: !Ref TestVPCCIDRBlock
+      TargetVpcSubnetId: !Ref PrivateSubnetBId
