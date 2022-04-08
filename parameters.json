@@ -1,0 +1,30 @@
+[
+  {
+    "ParameterKey": "ServerCertificateArn",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "ClientCidrBlock",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "DevVPCCIDRBlock",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "TestVPCCIDRBlock",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "EgressVPCId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "PrivateSubnetAId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "PrivateSubnetBId",
+    "ParameterValue": ""
+  }
+]
