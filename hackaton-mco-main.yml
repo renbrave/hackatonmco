@@ -1,0 +1,95 @@
+---
+## Virtual Company Starter Kit Labs
+## Infrastructure template without an RDS PostgreSQL instance for lab exercises
+##
+## Changelog:
+##
+## Dependencies:
+## none
+##
+## This sample code is made available under the MIT-0 license. See the LICENSE file.
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: Virtual Company Starter Kit Labs Stackset
+
+### Consider UI groupping for Parameters: 
+# Metadata:
+#   'AWS::CloudFormation::Interface':
+#     ParameterGroups:
+#     - Label:
+#         default: 'Parent Stacks'
+#       Parameters:
+#       - ParentKmsKeyStack
+#       - ParentS3VirusScanStack
+#       - ParentVpcEndpointStack
+#     - Label:
+#         default: 'S3 Parameters'
+#       Parameters:
+#       - BucketName
+#       - Access
+#       - Versioning
+#       - NoncurrentVersionExpirationInDays
+#       - ExpirationInDays
+#       - ExpirationPrefix
+#     - Label:
+#         default: 'Lambda Parameters'
+#       Parameters:
+#       - LambdaFunctionArn
+#       - LambdaFunctionEvent 
+
+## Parameters
+Parameters:
+  EnvType:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - prod
+      - dev
+  CreateVPN:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Determines if the VPN connection needs to be created.
+  TemplateName:
+    Type: String
+    Default: vir-comp-start
+    Description: Name used for different elements created.
+  
+## Conditions
+Conditions:
+  isInEE:
+    !Equals [ !Ref EnvType, "prod" ]
+  isNotInEE:
+    !Equals [ !Ref EnvType, "dev" ]
+
+## Resources
+Resources:
+  rdslabsVPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://vir-comp-start-cloudformation.s3.amazonaws.com/nested/vir-comp-start-vpc.yml
+      #Parameters:
+        #InstanceType: t2.micro
+        #KeyName: mykey
+      Parameters:
+        TemplateName: !Ref TemplateName
+  rdslabsC9Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://vir-comp-start-cloudformation.s3.amazonaws.com/nested/vir-comp-start-bastion-c9.yml
+      Parameters:
+          PubSubnetId: !GetAtt 'rdslabsVPCStack.Outputs.PublicSubnetA'
+          TemplateName: !Ref TemplateName
+          EnvType: !Ref EnvType
+          # C9_EC2InstanceType : String
+          # C9_AutoHibernateTimeout : String
+## Outputs
+Outputs:
+  LabVPC:
+    Description: RDS PostgreSQL Lab VPC
+    Value: !GetAtt rdslabsVPCStack.Outputs.MainVPC
+  Cloud9URL:
+    Description: Cloud9 URL
+    Value: !GetAtt rdslabsC9Stack.Outputs.Cloud9URL
